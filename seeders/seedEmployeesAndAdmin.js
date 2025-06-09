@@ -13,11 +13,13 @@ async function seed() {
     // Create 100 employees with hashed passwords
     const employees = [];
     for (let i = 0; i < 100; i++) {
+      const fullname = faker.person.fullName();
       const username = faker.internet.username();
       const password = await bcrypt.hash('password123', 10);
       const salary = faker.number.int({ min: 3000, max: 10000 });
 
       employees.push({
+        fullname,
         username,
         password,
         salary,

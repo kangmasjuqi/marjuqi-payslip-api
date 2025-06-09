@@ -10,6 +10,11 @@ const sequelize = require('../config/db');
  * Includes audit fields for traceability and compliance.
  */
 const Employee = sequelize.define('Employee', {
+  fullname: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    comment: 'Employee fullname'
+  },
   username: {
     type: DataTypes.STRING,
     unique: true,

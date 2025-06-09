@@ -7,16 +7,27 @@ module.exports = {
     const overtime = [];
     const reimbursement = [];
 
-    const periodId = 1;
+    const ip = '127.0.0.1';
     const startDate = moment('2025-06-01');
     const endDate = moment('2025-06-30');
     const totalWorkingDays = countWorkingDays(startDate.format('YYYY-MM-DD'), endDate.format('YYYY-MM-DD'));
-    const ip = '127.0.0.1';
+
+    await queryInterface.bulkInsert('payroll_periods', [{
+        start_date: startDate.toDate(),
+        end_date: endDate.toDate(),
+        is_processed: false,
+        created_by: 'admin',
+        updated_by: 'admin',
+        createdAt: moment().toDate(),
+        updatedAt: moment().toDate(),
+        ip_address: '127.0.0.1'
+    }], { returning: true });
+
+    const periodId = 1 // dummy
 
     for (let empId = 1; empId <= 100; empId++) {
-        let currentDate = startDate.clone();
-        
-        const empWorkingDays = 0;
+      let currentDate = startDate.clone();
+      let empWorkingDays = 0;
 
       while (currentDate.isSameOrBefore(endDate) && empWorkingDays < totalWorkingDays) {
         const weekday = currentDate.isoWeekday(); // 1 = Monday, 7 = Sunday
@@ -90,16 +101,16 @@ module.exports = {
 
 
     function countWorkingDays(startDateStr, endDateStr) {
-    const start = new Date(startDateStr);
-    const end = new Date(endDateStr);
-    let count = 0;
+        const start = new Date(startDateStr);
+        const end = new Date(endDateStr);
+        let count = 0;
 
-    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-        const day = d.getDay();
-        if (day !== 0 && day !== 6) count++; // Exclude Sunday (0) and Saturday (6)
-    }
+        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+            const day = d.getDay();
+            if (day !== 0 && day !== 6) count++; // Exclude Sunday (0) and Saturday (6)
+        }
 
-    return count;
+        return count;
     }        
         
   },
