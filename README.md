@@ -135,7 +135,7 @@ node seeders/seedEmployeesAndAdmin.js
 
 #### Simulate Payroll Data
 
-Generate attendance, overtime, and reimbursement data for the payroll period (2025-06-01 to 2025-06-30):
+Generate attendance, overtime, and reimbursement data for the payroll period defined in the seeder file `seedDataSimulation.js`:
 
 ```bash
 npx sequelize-cli db:seed:all --env development
@@ -425,16 +425,6 @@ Execute the complete test suite:
 npm test
 ```
 
-### Run Individual Test Files
-
-Execute specific test modules:
-
-```bash
-npm test -- tests/employeeController.test.js
-npm test -- tests/adminController.test.js
-npm test -- tests/authController.test.js
-```
-
 ### Test Categories
 
 - **Unit Tests**: Individual function and method testing
@@ -609,7 +599,6 @@ npm test -- tests/authController.test.js
 
 This documentation provides a comprehensive guide for understanding, implementing, and maintaining the Payroll Management System. For additional support or questions, please refer to the project's issue tracker or contact the development team.
 
-=====
 
 # Performance Analysis & Scalability Assessment - Simple Format
 
