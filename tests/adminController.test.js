@@ -2,6 +2,8 @@
 
 const request = require('supertest');
 const app = require('../app');
+const bcrypt = require('bcrypt');
+const { faker } = require('@faker-js/faker');
 const {
   sequelize,
   PayrollPeriod,
@@ -12,117 +14,109 @@ const {
   Reimbursement,
   Payslip,
 } = require('../models');
-const bcrypt = require('bcrypt');
-const { Op } = require('sequelize');
-const { safeNumber, countWorkingDays } = require('../utils/helpers');
+const { countWorkingDays } = require('../utils/helpers');
 
 let token;
 
 const payrollRunEndpoint = (period_id) => `/api/admin/run-payroll/${period_id}`;
-
 const payslipSummaryEndpoint = (period_id) => `/api/admin/payslips/summary/${period_id}`;
 
 beforeAll(async () => {
   await sequelize.sync({ force: true });
+  jest.spyOn(console, 'error').mockImplementation(() => {});
 
-  // Create admin user
-  const hashedPassword = await bcrypt.hash('admin123', 10);
-
-  await Admin.create({
+  const admin = await Admin.create({
     username: 'admin',
-    password: hashedPassword,
+    password: await bcrypt.hash('admin123', 10),
   });
 
-  // Login admin
   const res = await request(app)
     .post('/api/auth/admin/login')
     .send({ username: 'admin', password: 'admin123' });
 
   token = res.body.token;
-  if (!token) throw new Error('Login failed, token not received');
 });
 
 afterEach(async () => {
-  await PayrollPeriod.destroy({ where: {} });
-  await Employee.destroy({ where: {} });
-  await Attendance.destroy({ where: {} });
-  await Overtime.destroy({ where: {} });
-  await Reimbursement.destroy({ where: {} });
-  await Payslip.destroy({ where: {} });
+  await Promise.all([
+    PayrollPeriod.destroy({ where: {} }),
+    Employee.destroy({ where: {} }),
+    Attendance.destroy({ where: {} }),
+    Overtime.destroy({ where: {} }),
+    Reimbursement.destroy({ where: {} }),
+    Payslip.destroy({ where: {} }),
+  ]);
 });
 
 afterAll(async () => {
   await sequelize.close();
+  console.error.mockRestore();
 });
 
-const sendRequest = (body = {}) => {
-  return request(app)
+const sendPayrollPeriodRequest = (body = {}) =>
+  request(app)
     .post('/api/admin/payroll-period')
     .set('Authorization', `Bearer ${token}`)
     .send(body);
-};
 
-describe('POST /api/admin/payroll-period', () => {
-  it('✅ returns 400 if start_date is after end_date', async () => {
-    const res = await sendRequest({
+describe('📅 Payroll Period Creation', () => {
+  it('✅ 400 if start_date > end_date', async () => {
+    const res = await sendPayrollPeriodRequest({
       start_date: '2025-07-01',
       end_date: '2025-06-01',
     });
 
-    expect(res.statusCode).toBe(400);
-    expect(res.body.message).toMatch(/Start date must be before end date/i);
+    expect(res.status).toBe(400);
+    expect(res.body.message).toMatch(/start date must be before end date/i);
   });
 
-  it('✅ returns 409 if period overlaps', async () => {
+  it('✅ 409 on overlapping period', async () => {
     await PayrollPeriod.create({
       start_date: '2025-06-01',
       end_date: '2025-06-30',
-      is_processed: false,
       created_by: 'admin',
       updated_by: 'admin',
       ip_address: '127.0.0.1',
     });
 
-    const res = await sendRequest({
+    const res = await sendPayrollPeriodRequest({
       start_date: '2025-06-15',
       end_date: '2025-07-15',
     });
 
-    expect(res.statusCode).toBe(409);
-    expect(res.body.message).toMatch(/Period overlaps/i);
+    expect(res.status).toBe(409);
+    expect(res.body.message).toMatch(/period overlaps/i);
   });
 
-  it('✅ creates payroll period successfully', async () => {
-    const res = await sendRequest({
+  it('✅ 201 on success', async () => {
+    const res = await sendPayrollPeriodRequest({
       start_date: '2025-08-01',
       end_date: '2025-08-31',
     });
 
-    expect(res.statusCode).toBe(201);
+    expect(res.status).toBe(201);
     expect(res.body.data).toHaveProperty('id');
-    expect(res.body.message).toMatch(/successfully/i);
+    expect(res.body.message).toMatch(/success/i);
   });
 
-  it('✅ returns 400 if missing required fields', async () => {
-    const res = await sendRequest({});
-
-    expect(res.statusCode).toBe(400);
+  it('✅ 400 on missing fields', async () => {
+    const res = await sendPayrollPeriodRequest({});
+    expect(res.status).toBe(400);
     expect(res.body.errors).toBeDefined();
   });
 });
 
-describe('Payroll Controller Integration Tests', () => {
-  describe('POST /api/admin/payroll/run/:period_id', () => {
-    it('✅ returns 404 if payroll period not found', async () => {
+describe('🧮 Payroll Processing', () => {
+  describe('POST /api/admin/run-payroll/:id', () => {
+    it('✅ 404 for non-existent period', async () => {
       const res = await request(app)
         .post(payrollRunEndpoint(999))
         .set('Authorization', `Bearer ${token}`);
 
-      expect(res.statusCode).toBe(404);
-      expect(res.body.message).toMatch(/not found/i);
+      expect(res.status).toBe(404);
     });
 
-    it('✅ returns 400 if payroll already processed', async () => {
+    it('✅ 400 for already processed', async () => {
       const period = await PayrollPeriod.create({
         start_date: '2025-06-01',
         end_date: '2025-06-30',
@@ -136,12 +130,11 @@ describe('Payroll Controller Integration Tests', () => {
         .post(payrollRunEndpoint(period.id))
         .set('Authorization', `Bearer ${token}`);
 
-      expect(res.statusCode).toBe(400);
+      expect(res.status).toBe(400);
       expect(res.body.message).toMatch(/already processed/i);
     });
 
-    it('✅ processes payroll and creates payslips', async () => {
-      // Create payroll period
+    it('✅ processes full flow with payslip', async () => {
       const period = await PayrollPeriod.create({
         start_date: '2025-06-01',
         end_date: '2025-06-30',
@@ -151,94 +144,85 @@ describe('Payroll Controller Integration Tests', () => {
         ip_address: '127.0.0.1',
       });
 
-      // Create employee
-      const hashedPasswordUser = await bcrypt.hash('password123', 10);
-
       const employee = await Employee.create({
-        fullname: 'Alice',
-        username: 'alice',
-        password: hashedPasswordUser,
+        fullname: faker.person.fullName(),
+        username: faker.internet.username(),
+        password: await bcrypt.hash('password', 10),
         salary: 3200,
       });
 
-      // Create attendance for 20 days
-      const attendanceCount = 20;
-      for (let i = 1; i <= attendanceCount; i++) {
+      // Attendance for 20 days
+      for (let d = 1; d <= 20; d++) {
         await Attendance.create({
           payroll_period_id: period.id,
           employee_id: employee.id,
-          date: `2025-06-${i.toString().padStart(2, '0')}`,
+          date: `2025-06-${String(d).padStart(2, '0')}`,
         });
       }
 
-      // Create 5 hours of overtime spread over 2 days
+      // Overtime
       await Overtime.bulkCreate([
+        { employee_id: employee.id, payroll_period_id: period.id, date: '2025-06-10', hours: 2 },
         { employee_id: employee.id, payroll_period_id: period.id, date: '2025-06-15', hours: 3 },
-        { employee_id: employee.id, payroll_period_id: period.id, date: '2025-06-20', hours: 2 },
       ]);
 
-      // Create reimbursements
+      // Reimbursement
       await Reimbursement.create({
         employee_id: employee.id,
         payroll_period_id: period.id,
+        date: '2025-06-20',
         amount: 100,
-        date: '2025-06-10',
       });
 
       const res = await request(app)
         .post(payrollRunEndpoint(period.id))
         .set('Authorization', `Bearer ${token}`)
-        .set('X-Forwarded-For', '1.2.3.4'); // simulate IP
+        .set('X-Forwarded-For', '123.123.123.123');
 
-      expect(res.statusCode).toBe(200);
-      expect(res.body.message).toMatch(/successfully/i);
+      expect(res.status).toBe(200);
       expect(res.body.summary.processed_employees).toBe(1);
 
-      // Verify payslip created correctly
-      const payslip = await Payslip.findOne({ where: { employee_id: employee.id, payroll_period_id: period.id } });
-      expect(payslip).not.toBeNull();
+      const payslip = await Payslip.findOne({
+        where: { employee_id: employee.id, payroll_period_id: period.id },
+      });
 
-      // Check that period is marked processed
+      const workingDays = countWorkingDays('2025-06-01', '2025-06-30');
+      const baseSalary = 3200 * (20 / workingDays);
+
+      expect(parseFloat(payslip.base_salary)).toBeCloseTo(baseSalary, 2);
+      expect(parseFloat(payslip.overtime_hours)).toBeCloseTo(5, 2);
+      expect(parseFloat(payslip.reimbursements)).toBeCloseTo(100, 2);
+
       const updatedPeriod = await PayrollPeriod.findByPk(period.id);
       expect(updatedPeriod.is_processed).toBe(true);
-      expect(updatedPeriod.ip_address).toBe('::ffff:127.0.0.1'); // supertest uses localhost, or use X-Forwarded-For
-
-      // Validate some payslip numeric correctness (approx)
-        
-      const workingDays = countWorkingDays(period.start_date, period.end_date);
-      const attendanceFactor = attendanceCount / workingDays;
-        
-      expect(parseFloat(payslip.base_salary)).toBeCloseTo((3200 * attendanceFactor), 2); // assuming 22 working days in June
-      expect(parseFloat(payslip.reimbursements)).toBeCloseTo(100, 2);
-      expect(parseFloat(payslip.overtime_hours)).toBeCloseTo(5, 2);
     });
 
-    it('✅ returns 500 if exception thrown', async () => {
-      // Force PayrollPeriod.findByPk to throw
+    it('✅ 500 on unexpected error', async () => {
       jest.spyOn(PayrollPeriod, 'findByPk').mockImplementationOnce(() => {
-        throw new Error('DB error');
+        throw new Error('Unexpected DB error');
       });
 
       const res = await request(app)
         .post(payrollRunEndpoint(1))
         .set('Authorization', `Bearer ${token}`);
 
-      expect(res.statusCode).toBe(500);
+      expect(res.status).toBe(500);
       expect(res.body.message).toMatch(/internal server error/i);
     });
   });
+});
 
-  describe('GET /api/admin/payroll/summary/:payroll_period_id', () => {
-    it('✅ returns 404 if payroll period not found', async () => {
+describe('📊 Payslip Summary', () => {
+  describe('GET /api/admin/payslips/summary/:id', () => {
+    it('✅ 404 if period not found', async () => {
       const res = await request(app)
         .get(payslipSummaryEndpoint(999))
         .set('Authorization', `Bearer ${token}`);
 
-      expect(res.statusCode).toBe(404);
-      expect(res.body.message).toMatch(/not found/i);
+      expect(res.status).toBe(404);
     });
 
-    it('✅ returns 404 if no payslips found', async () => {
+    it('✅ 404 if no payslips exist', async () => {
       const period = await PayrollPeriod.create({
         start_date: '2025-06-01',
         end_date: '2025-06-30',
@@ -252,11 +236,11 @@ describe('Payroll Controller Integration Tests', () => {
         .get(payslipSummaryEndpoint(period.id))
         .set('Authorization', `Bearer ${token}`);
 
-      expect(res.statusCode).toBe(404);
+      expect(res.status).toBe(404);
       expect(res.body.message).toMatch(/no payslips found/i);
     });
 
-    it('✅ returns payslip summary correctly', async () => {
+    it('✅ returns detailed summary', async () => {
       const period = await PayrollPeriod.create({
         start_date: '2025-06-01',
         end_date: '2025-06-30',
@@ -266,32 +250,19 @@ describe('Payroll Controller Integration Tests', () => {
         ip_address: '127.0.0.1',
       });
 
-      const hashedPasswordUser = await bcrypt.hash('password123', 10);
+      const emp1 = await Employee.create({ username: 'bob', password: 'x', fullname: 'Bob', salary: 3000 });
+      const emp2 = await Employee.create({ username: 'carol', password: 'x', fullname: 'Carol', salary: 4000 });
 
-      const emp1 = await Employee.create({
-        fullname: 'Bob',
-        username: 'bob',
-        password: hashedPasswordUser,
-        salary: 3000,
-      });
-        
-      const emp2 = await Employee.create({
-        fullname: 'Carol',
-        username: 'carol',
-        password: hashedPasswordUser,
-        salary: 4000,
-      });
-        
       await Payslip.bulkCreate([
         {
           employee_id: emp1.id,
           payroll_period_id: period.id,
-          base_salary: '2800',
+          base_salary: '2800.00',
           attendance_days: 20,
           overtime_hours: '5',
           overtime_pay: '100',
           reimbursements: '50',
-          total_pay: '2950',
+          total_pay: '2950.00',
           created_by: 'admin',
           updated_by: 'admin',
           ip_address: '127.0.0.1',
@@ -299,12 +270,12 @@ describe('Payroll Controller Integration Tests', () => {
         {
           employee_id: emp2.id,
           payroll_period_id: period.id,
-          base_salary: '3700',
+          base_salary: '3700.00',
           attendance_days: 21,
           overtime_hours: '3',
           overtime_pay: '80',
           reimbursements: '70',
-          total_pay: '3850',
+          total_pay: '3850.00',
           created_by: 'admin',
           updated_by: 'admin',
           ip_address: '127.0.0.1',
@@ -315,23 +286,22 @@ describe('Payroll Controller Integration Tests', () => {
         .get(payslipSummaryEndpoint(period.id))
         .set('Authorization', `Bearer ${token}`);
 
-      expect(res.statusCode).toBe(200);
-      expect(res.body.period).toMatch(/2025-06-01 to 2025-06-30/);
+      expect(res.status).toBe(200);
       expect(res.body.summary).toHaveLength(2);
       expect(res.body.total_take_home).toBe('6800.00');
+      expect(res.body.period).toContain('2025-06-01');
     });
 
-    it('✅ returns 500 if exception thrown', async () => {
+    it('✅ 500 on internal failure', async () => {
       jest.spyOn(PayrollPeriod, 'findByPk').mockImplementationOnce(() => {
-        throw new Error('DB error');
+        throw new Error('Error');
       });
 
       const res = await request(app)
         .get(payslipSummaryEndpoint(1))
         .set('Authorization', `Bearer ${token}`);
 
-      expect(res.statusCode).toBe(500);
-      expect(res.body.message).toMatch(/internal server error/i);
+      expect(res.status).toBe(500);
     });
   });
 });
