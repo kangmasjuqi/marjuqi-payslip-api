@@ -1,0 +1,51 @@
+# Node.js
+node_modules/
+npm-debug.log
+.env
+.DS_Store
+*.tgz
+/build
+/dist
+/tmp
+
+# PostgreSQL
+.psqlrc
+pg_hba.conf
+pg_ident.conf
+postgresql.conf
+postmaster.pid
+initdb.log
+log/
+data/
+pdf/
+
+# Environment variables (sensitive information)
+.env
+.env.*
+
+# Logs
+logs/
+*.log
+
+# macOS specific files
+.DS_Store
+.Trashes
+Thumbs.db # Windows thumbnails
+
+# IDE specific files
+.vscode/        # VS Code
+.idea/          # WebStorm/IntelliJ
+*.sublime-project
+*.sublime-workspace
+
+# Testing
+coverage/
+
+# Production builds
+/dist/
+/build/
+
+# Other temporary files
+*.tmp
+*.swp
+*~
