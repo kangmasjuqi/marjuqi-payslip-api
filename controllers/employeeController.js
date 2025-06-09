@@ -209,12 +209,12 @@ exports.generatePayslip = async (req, res) => {
 
   try {
     const period = await PayrollPeriod.findByPk(payroll_period_id);
-    if (!period) return res.status(404).json({ message: '❌ Payroll period not found.' });
+    if (!period) return res.status(400).json({ error: '❌ Payroll period not found.' });
 
     const existing = await Payslip.findOne({
       where: { employee_id: employeeId, payroll_period_id }
     });
-    if (existing) return res.status(400).json({ message: '❌ Payslip already generated.' });
+    if (existing) return res.status(409).json({ error: '❌ Payslip already generated.' });
 
     const emp = await Employee.findByPk(employeeId);
     const baseSalary = parseFloat(emp.salary);
@@ -271,8 +271,8 @@ exports.generatePayslip = async (req, res) => {
       ip_address: ip
     };
 
-    // store to DB 
-    // await Payslip.create(payslip);
+    // ATM, only stored as PDF file, no store to DB
+      // await Payslip.create(payslip);
 
     // PDF generation
     const doc = new PDFDocument({ margin: 50 });
@@ -343,6 +343,6 @@ exports.generatePayslip = async (req, res) => {
 
   } catch (err) {
     console.error('[generatePayslip]', err);
-    res.status(500).json({ message: '❌ Internal server error.' });
+    res.status(500).json({ error: '❌ Internal server error.' });
   }
 };
