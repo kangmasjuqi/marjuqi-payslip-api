@@ -1,6 +1,19 @@
 ## Setup Instructions
 
-### 1. Clone the Repository
+### 1.1 Clone the Repository
+
+
+### 1.2 Setup DB
+
+    psql -U postgres
+
+        CREATE USER postgres_user WITH PASSWORD 'Postgres25$';
+
+        CREATE DATABASE payslip_db OWNER postgres_user;
+        GRANT ALL PRIVILEGES ON DATABASE payslip_db TO postgres_user;
+
+        CREATE DATABASE payslip_db_test OWNER postgres_user;
+        GRANT ALL PRIVILEGES ON DATABASE payslip_db_test TO postgres_user;
 
 ### 2. Install Dependencies
 
