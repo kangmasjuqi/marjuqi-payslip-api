@@ -1,6 +1,5 @@
 const express = require('express');
 const {
-  getAllEmployees,
   submitAttendance,
   submitOvertime,
   submitReimbursement,
@@ -10,7 +9,6 @@ const {
 const router = express.Router();
 const authEmployee = require('../middleware/authEmployee');
 
-// router.get('/', getAllEmployees);
 router.post('/attendance', authEmployee, submitAttendance);
 router.post('/overtime', authEmployee, submitOvertime);
 router.post('/reimbursement', authEmployee, submitReimbursement);

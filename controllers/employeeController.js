@@ -6,20 +6,6 @@ const path = require('path');
 const PDFDocument = require('pdfkit');
 const { safeNumber, countWorkingDays } = require('../utils/helpers');
 
-/**
- * Get list of all employees (exclude password field).
- */
-exports.getAllEmployees = async (req, res) => {
-  try {
-    const employees = await Employee.findAll({
-      attributes: { exclude: ['password'] }
-    });
-    res.json(employees);
-  } catch (error) {
-    console.error('getAllEmployees error:', error);
-    res.status(500).json({ error: 'Internal Server Error' });
-  }
-};
 
 /**
  * Employee submits attendance for today.
