@@ -5,6 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const PDFDocument = require('pdfkit');
 const { safeNumber, countWorkingDays } = require('../utils/helpers');
+const logAuditEvent = require('../utils/auditLogger');
 
 
 /**
@@ -52,7 +53,7 @@ exports.submitAttendance = async (req, res) => {
     }
 
     // Create attendance record
-    await Attendance.create({
+    const newAttendance = await Attendance.create({
       employee_id: employeeId,
       date: today.format('YYYY-MM-DD'),
       payroll_period_id: payrollPeriod.id,
@@ -61,6 +62,18 @@ exports.submitAttendance = async (req, res) => {
       ip_address: ipAddress
     });
 
+    const requestId = req.requestId ? req.requestId : 'N/A';
+    await logAuditEvent({
+      userId: employeeId,
+      userRole: 'employee',
+      action: 'CREATE_ATTENDANCE',
+      tableName: 'Attendance',
+      recordId: newAttendance.id,
+      ipAddress: ipAddress,
+      requestId: requestId,
+      details: newAttendance
+    });   
+      
     return res.status(201).json({ message: 'Attendance submitted successfully.' });
   } catch (error) {
     console.error('submitAttendance error:', error);
@@ -126,7 +139,7 @@ exports.submitOvertime = async (req, res) => {
     }
 
     // Create overtime entry
-    await Overtime.create({
+    const newOvertime = await Overtime.create({
       employee_id: employeeId,
       date: submittedDate.format('YYYY-MM-DD'),
       hours: parseFloat(hours),
@@ -135,6 +148,18 @@ exports.submitOvertime = async (req, res) => {
       updated_by: employeeId.toString(),
       ip_address: ipAddress
     });
+
+    const requestId = req.requestId ? req.requestId : 'N/A';
+    await logAuditEvent({
+      userId: employeeId,
+      userRole: 'employee',
+      action: 'CREATE_OVERTIME',
+      tableName: 'Overtime',
+      recordId: newOvertime.id,
+      ipAddress: ipAddress,
+      requestId: requestId,
+      details: newOvertime
+    });   
 
     return res.status(201).json({ message: 'Overtime submitted successfully.' });
   } catch (error) {
@@ -182,7 +207,7 @@ exports.submitReimbursement = async (req, res) => {
     }
 
     // Create reimbursement record
-    await Reimbursement.create({
+    const newReimbursement = await Reimbursement.create({
       employee_id: employeeId,
       date: expenseDate.format('YYYY-MM-DD'),
       amount: parseFloat(amount).toFixed(2),
@@ -193,6 +218,18 @@ exports.submitReimbursement = async (req, res) => {
       ip_address: ipAddress
     });
 
+    const requestId = req.requestId ? req.requestId : 'N/A';
+    await logAuditEvent({
+      userId: employeeId,
+      userRole: 'employee',
+      action: 'CREATE_REIMBURSEMENT',
+      tableName: 'Reimbursement',
+      recordId: newReimbursement.id,
+      ipAddress: ipAddress,
+      requestId: requestId,
+      details: newReimbursement
+    });
+      
     return res.status(201).json({ message: 'Reimbursement submitted successfully.' });
   } catch (error) {
     console.error('submitReimbursement error:', error);
@@ -272,7 +309,18 @@ exports.generatePayslip = async (req, res) => {
     };
 
     // ATM, only stored as PDF file, no store to DB
-      // await Payslip.create(payslip);
+    //   const newPayslip = await Payslip.create(payslip);
+    //     const requestId = req.requestId ? req.requestId : 'N/A';
+    //     await logAuditEvent({
+    //         userId: employeeId,
+    //         userRole: 'employee',
+    //         action: 'CREATE_PAYSLIP',
+    //         tableName: 'Payslip',
+    //         recordId: newPayslip.id,
+    //         ipAddress: ipAddress,
+    //         requestId: requestId,
+    //         details: newPayslip
+    //     });       
 
     // PDF generation
     const doc = new PDFDocument({ margin: 50 });

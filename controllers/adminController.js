@@ -2,6 +2,7 @@ const { PayrollPeriod, Employee, Attendance, Overtime, Reimbursement, Payslip } 
 const { validationResult } = require('express-validator');
 const { Op, Sequelize } = require('sequelize');
 const { safeNumber, countWorkingDays } = require('../utils/helpers');
+const logAuditEvent = require('../utils/auditLogger');
 
 /**
  * Admin defines a new payroll period.
@@ -41,6 +42,18 @@ exports.createPayrollPeriod = async (req, res) => {
       ip_address: ip
     });
 
+    const requestId = req.requestId ? req.requestId : 'N/A';
+    await logAuditEvent({
+        userId: req.user?.id,
+        userRole: 'admin',
+        action: 'CREATE_PAYROLLPERIOD',
+        tableName: 'PayrollPeriod',
+        recordId: period.id,
+        ipAddress: ip,
+        requestId: requestId,
+        details: period
+    });  
+      
     res.status(201).json({
       message: '✅ Payroll period created successfully.',
       data: period
@@ -143,13 +156,44 @@ exports.runPayroll = async (req, res) => {
     }
 
     // Bulk insert all payslips
-    await Payslip.bulkCreate(payslipData);
+    let createdPayslips = await Payslip.bulkCreate(payslipData);
 
+    const requestId = req.requestId ? req.requestId : 'N/A';
+    // Loop through the *created* payslip instances and log each one
+    for (const payslipInstance of createdPayslips) {
+      await logAuditEvent({
+        userId: req.user?.id,
+        userRole: 'admin',
+        action: 'CREATE_PAYSLIP_BY_ADMIN',
+        tableName: 'Payslip',
+        recordId: payslipInstance.id,
+        ipAddress: ip,
+        requestId: requestId,
+        details: {
+          employee_id: payslipInstance.employee_id,
+          payroll_period_id: payslipInstance.payroll_period_id,
+          total_pay: payslipInstance.total_pay,
+        },
+      });
+    } 
+      
     // Mark period as processed
     period.is_processed = true;
     period.updated_by = adminUsername;
     period.ip_address = ip;
     await period.save();
+
+    // Mark period as processed
+    await logAuditEvent({
+        userId: req.user?.id,
+        userRole: 'admin',
+        action: 'UPDATE_PAYROLLPERIOD',
+        tableName: 'PayrollPeriod',
+        recordId: period.id,
+        ipAddress: ip,
+        requestId: requestId,
+        details: period
+    });  
 
     res.status(200).json({
       message: '✅ Payroll processed successfully.',
