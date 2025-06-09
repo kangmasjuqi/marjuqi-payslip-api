@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "NODE_ENV=test jest tests/adminController.test.js && NODE_ENV=test jest tests/employeeController.test.js"
+    "test": "NODE_ENV=test jest tests/authController.test.js && NODE_ENV=test jest tests/adminController.test.js && NODE_ENV=test jest tests/employeeController.test.js"
   },
   "keywords": [],
   "author": "",
