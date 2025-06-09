@@ -1,6 +1,8 @@
+// tests/adminController.test.js
+
 const request = require('supertest');
 const app = require('../app');
-const { sequelize, PayrollPeriod, Admin } = require('../models');
+const { sequelize, PayrollPeriod, Admin, Employee, Attendance, Overtime, Reimbursement, Payslip } = require('../models');
 const bcrypt = require('bcrypt');
 
 let token;
@@ -28,7 +30,7 @@ beforeAll(async () => {
     .post('/api/auth/admin/login')
     .send({ username: 'admin', password: 'admin123' });
 
-  console.log('LOGIN RESPONSE:', res.statusCode, res.body);
+    //   console.log('LOGIN RESPONSE:', res.statusCode, res.body);
 
   token = res.body.token;
   if (!token) throw new Error('Login failed, token not received');
