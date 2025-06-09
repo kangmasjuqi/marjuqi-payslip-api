@@ -57,7 +57,7 @@ app.get('/', (req, res) => {
 // --- Start Server ---
 sequelize.authenticate()
   .then(() => {
-    console.log('✅ Database connected.');
+    console.log('✅ Database connected to:', sequelize.config.database);
     app.listen(PORT, () => {
       console.log(`🚀 Server running at http://localhost:${PORT}`);
     });
