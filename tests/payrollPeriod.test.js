@@ -1,9 +1,37 @@
 const request = require('supertest');
-const app = require('../server');
-const { sequelize, PayrollPeriod } = require('../models');
+const app = require('../app');
+const { sequelize, PayrollPeriod, Admin } = require('../models');
+const bcrypt = require('bcrypt');
+
+let token;
+const endpoint = '/api/admin/payroll-period';
+
+const sendRequest = (body = {}) => {
+  return request(app)
+    .post(endpoint)
+    .set('Authorization', `Bearer ${token}`)
+    .send(body);
+};
 
 beforeAll(async () => {
   await sequelize.sync({ force: true });
+
+  // Create admin user
+  const hashedPassword = await bcrypt.hash('admin123', 10);
+  await Admin.create({
+    username: 'admin',
+    password: hashedPassword,
+  });
+
+  // Login admin
+  const res = await request(app)
+    .post('/api/auth/admin/login')
+    .send({ username: 'admin', password: 'admin123' });
+
+  console.log('LOGIN RESPONSE:', res.statusCode, res.body);
+
+  token = res.body.token;
+  if (!token) throw new Error('Login failed, token not received');
 });
 
 afterEach(async () => {
@@ -14,17 +42,8 @@ afterAll(async () => {
   await sequelize.close();
 });
 
-describe('POST /api/admin/payroll-periods', () => {
-  const endpoint = '/api/admin/payroll-periods';
-
-  const sendRequest = (body = {}, token = 'Bearer faketoken') => {
-    return request(app)
-      .post(endpoint)
-      .set('Authorization', token) // depends on your authMiddleware
-      .send(body);
-  };
-
-  it('❌ returns 400 if start_date is after end_date', async () => {
+describe('POST /api/admin/payroll-period', () => {
+  it('✅ returns 400 if start_date is after end_date', async () => {
     const res = await sendRequest({
       start_date: '2025-07-01',
       end_date: '2025-06-01',
@@ -34,7 +53,7 @@ describe('POST /api/admin/payroll-periods', () => {
     expect(res.body.message).toMatch(/Start date must be before end date/i);
   });
 
-  it('❌ returns 409 if period overlaps', async () => {
+  it('✅ returns 409 if period overlaps', async () => {
     await PayrollPeriod.create({
       start_date: '2025-06-01',
       end_date: '2025-06-30',
@@ -64,7 +83,7 @@ describe('POST /api/admin/payroll-periods', () => {
     expect(res.body.message).toMatch(/successfully/i);
   });
 
-  it('❌ returns 400 if missing required fields', async () => {
+  it('✅ returns 400 if missing required fields', async () => {
     const res = await sendRequest({});
 
     expect(res.statusCode).toBe(400);
