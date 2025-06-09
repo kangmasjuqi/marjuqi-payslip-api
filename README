@@ -1,231 +1,610 @@
-## Setup Instructions
+# Payroll Management System
 
-### 1.1 Clone the Repository
+A comprehensive Node.js-based payroll management system with PostgreSQL database, featuring employee attendance tracking, overtime management, reimbursement processing, and automated payslip generation.
 
+## Table of Contents
 
-### 1.2 Setup DB
+- [Features](#features)
+- [System Requirements](#system-requirements)
+- [Installation Guide](#installation-guide)
+- [Configuration](#configuration)
+- [Database Setup](#database-setup)
+- [API Documentation](#api-documentation)
+- [Authentication](#authentication)
+- [User Roles](#user-roles)
+- [Testing](#testing)
+- [Architecture Overview](#architecture-overview)
+- [Troubleshooting](#troubleshooting)
 
-    psql -U postgres
+## Features
 
-        CREATE USER postgres_user WITH PASSWORD 'Postgres25$';
+### Core Functionality
+- **Employee Management**: Comprehensive employee data management with secure authentication
+- **Attendance Tracking**: Daily attendance submission and tracking
+- **Overtime Management**: Flexible overtime hour logging with automatic pay calculations
+- **Reimbursement Processing**: Expense claim submission and approval workflow
+- **Payroll Processing**: Automated payroll calculation for defined periods
+- **Payslip Generation**: PDF payslip generation with detailed breakdown
+- **Administrative Dashboard**: Summary reports and payroll management tools
 
-        CREATE DATABASE payslip_db OWNER postgres_user;
-        GRANT ALL PRIVILEGES ON DATABASE payslip_db TO postgres_user;
+### Technical Features
+- JWT-based authentication and authorization
+- Role-based access control (Admin/Employee)
+- RESTful API architecture
+- PostgreSQL database with Sequelize ORM
+- Automated database seeding for testing
+- Comprehensive test suite
+- PDF generation for payslips
+- Audit trail with IP tracking
 
-        CREATE DATABASE payslip_db_test OWNER postgres_user;
-        GRANT ALL PRIVILEGES ON DATABASE payslip_db_test TO postgres_user;
+## System Requirements
 
-### 2. Install Dependencies
+- **Node.js**: Version 14.x or higher
+- **PostgreSQL**: Version 12.x or higher
+- **npm**: Version 6.x or higher
+- **Operating System**: Linux, macOS, or Windows
 
-  ```bash
-  npm install
-  ```
+## Installation Guide
 
-### 3. Create a `.env` File
+### Step 1: Clone the Repository
 
-  ```bash
-  cp .env.example .env
-  ```
+```bash
+git clone <repository-url>
+cd payroll-management-system
+```
 
-### 4. Generate a JWT Secret
+### Step 2: Install Dependencies
 
-  ```bash
-  node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-  ```
+```bash
+npm install
+```
 
-### 5.1 Run Seeders to generate 1 admin and 100 employees with random data
+### Step 3: Environment Configuration
 
-  ```bash
-  node seeders/seedEmployeesAndAdmin.js
-  ```
+Create your environment configuration file:
 
-### 5.2 Seeder DB to simulate attendance, overtime and reimbursements for most of 100 employee during payrol period #1 2025-06-01 until 2025-06-30
+```bash
+cp .env.example .env
+```
 
-  ```bash
-  npx sequelize-cli db:seed:all --env development
-  ```
+Edit the `.env` file with your specific configuration:
 
-### 6. Start the Server
+```env
+# Database Configuration
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=payslip_db
+DB_USER=postgres_user
+DB_PASSWORD=Postgres25$
+DB_TEST_NAME=payslip_db_test
 
-  ```bash
-  node server.js
-  ```
+# JWT Configuration
+JWT_SECRET=<generated-secret-key>
+JWT_EXPIRES_IN=24h
 
+# Server Configuration
+PORT=3000
+NODE_ENV=development
+```
 
-## API Endpoints
+### Step 4: Generate JWT Secret
 
-### 1. ADMIN - Create Payroll Period
+Generate a secure JWT secret key:
 
-  **Sample Request:**
-  ```bash
-  curl -X POST http://localhost:3000/api/admin/payroll-period \
-    -H "Content-Type: application/json" \
-    -H "Authorization: Bearer <ADMIN_TOKEN>" \
-    -d '{
-      "start_date": "2025-06-01",
-      "end_date": "2025-06-30"
-    }'
-  ```
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
 
-  **Sample Response:**
-  ```json
-  {
-    "message": "✅ Payroll period created successfully.",
-    "data": {
+Copy the generated key to your `.env` file as `JWT_SECRET`.
+
+## Database Setup
+
+### PostgreSQL Database Creation
+
+1. **Connect to PostgreSQL**:
+```bash
+psql -U postgres
+```
+
+2. **Create Database User**:
+```sql
+CREATE USER postgres_user WITH PASSWORD 'Postgres25$';
+```
+
+3. **Create Production Database**:
+```sql
+CREATE DATABASE payslip_db OWNER postgres_user;
+GRANT ALL PRIVILEGES ON DATABASE payslip_db TO postgres_user;
+```
+
+4. **Create Test Database**:
+```sql
+CREATE DATABASE payslip_db_test OWNER postgres_user;
+GRANT ALL PRIVILEGES ON DATABASE payslip_db_test TO postgres_user;
+```
+
+### Database Seeding
+
+#### Generate Sample Data
+
+Create 1 admin user and 100 sample employees:
+
+```bash
+node seeders/seedEmployeesAndAdmin.js
+```
+
+#### Simulate Payroll Data
+
+Generate attendance, overtime, and reimbursement data for the payroll period (2025-06-01 to 2025-06-30):
+
+```bash
+npx sequelize-cli db:seed:all --env development
+```
+
+### Start the Application
+
+```bash
+node server.js
+```
+
+The server will start on `http://localhost:3000` (or your configured port).
+
+## API Documentation
+
+### Authentication Endpoints
+
+#### Employee Login
+Authenticate an employee and receive a JWT token.
+
+**Endpoint**: `POST /api/auth/login`
+
+**Request Body**:
+```json
+{
+  "username": "Stanford.Goyette",
+  "password": "password123"
+}
+```
+
+**Response**:
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+#### Admin Login
+Authenticate an administrator and receive a JWT token.
+
+**Endpoint**: `POST /api/auth/admin/login`
+
+**Request Body**:
+```json
+{
+  "username": "admin",
+  "password": "admin123"
+}
+```
+
+**Response**:
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+### Employee Operations
+
+#### Submit Daily Attendance
+Record employee attendance for the current day.
+
+**Endpoint**: `POST /api/employees/attendance`
+**Authorization**: Bearer Token (Employee)
+
+**Request Body**: `{}` (Empty object)
+
+**Response**:
+```json
+{
+  "message": "Attendance submitted successfully."
+}
+```
+
+#### Submit Overtime Hours
+Log overtime hours worked on a specific date.
+
+**Endpoint**: `POST /api/employees/overtime`
+**Authorization**: Bearer Token (Employee)
+
+**Request Body**:
+```json
+{
+  "date": "2025-06-07",
+  "hours": 2.5
+}
+```
+
+**Response**:
+```json
+{
+  "message": "Overtime submitted successfully."
+}
+```
+
+#### Submit Reimbursement Claim
+Submit an expense reimbursement request.
+
+**Endpoint**: `POST /api/employees/reimbursement`
+**Authorization**: Bearer Token (Employee)
+
+**Request Body**:
+```json
+{
+  "amount": 150.75,
+  "description": "Taxi fare for client meeting",
+  "date": "2025-06-07"
+}
+```
+
+**Response**:
+```json
+{
+  "message": "Reimbursement submitted successfully."
+}
+```
+
+#### Generate Personal Payslip
+Generate and download a PDF payslip for a specific payroll period.
+
+**Endpoint**: `POST /api/employees/generate-payslip`
+**Authorization**: Bearer Token (Employee)
+
+**Request Body**:
+```json
+{
+  "payroll_period_id": 1
+}
+```
+
+**Response**:
+```json
+{
+  "message": "✅ Payslip generated successfully.",
+  "payslip": {
+    "employee_id": 6,
+    "payroll_period_id": 1,
+    "base_salary": "7637.14",
+    "attendance_days": 22,
+    "overtime_hours": "14.68",
+    "overtime_pay": "1216.10",
+    "reimbursements": "150.75",
+    "total_pay": "9004.00",
+    "created_by": "Stanford.Goyette",
+    "updated_by": "Stanford.Goyette",
+    "ip_address": "::1"
+  },
+  "pdf": "/pdf/payslip_6_1.pdf"
+}
+```
+
+### Administrative Operations
+
+#### Create Payroll Period
+Define a new payroll period for processing.
+
+**Endpoint**: `POST /api/admin/payroll-period`
+**Authorization**: Bearer Token (Admin)
+
+**Request Body**:
+```json
+{
+  "start_date": "2025-06-01",
+  "end_date": "2025-06-30"
+}
+```
+
+**Response**:
+```json
+{
+  "message": "✅ Payroll period created successfully.",
+  "data": {
+    "id": 1,
+    "start_date": "2025-06-01",
+    "end_date": "2025-06-30",
+    "is_processed": false,
+    "created_by": "admin",
+    "updated_by": "admin",
+    "ip_address": "::1",
+    "updatedAt": "2025-06-08T12:49:42.890Z",
+    "createdAt": "2025-06-08T12:49:42.890Z"
+  }
+}
+```
+
+#### Process Payroll
+Execute payroll processing for a specific period.
+
+**Endpoint**: `POST /api/admin/run-payroll/{payroll_period_id}`
+**Authorization**: Bearer Token (Admin)
+
+**Example**: `POST /api/admin/run-payroll/1`
+
+**Response**:
+```json
+{
+  "message": "✅ Payroll processed successfully.",
+  "summary": {
+    "processed_employees": 100,
+    "period": {
       "id": 1,
-      "start_date": "2025-06-01",
-      "end_date": "2025-06-30",
-      "is_processed": false,
-      "created_by": "admin",
-      "updated_by": "admin",
-      "ip_address": "::1",
-      "updatedAt": "2025-06-08T12:49:42.890Z",
-      "createdAt": "2025-06-08T12:49:42.890Z"
+      "start": "2025-06-01",
+      "end": "2025-06-30"
     }
   }
-  ```
+}
+```
 
-### 2. Employee - Login
+#### Generate Payroll Summary
+Retrieve comprehensive payroll summary for all employees in a period.
 
-  **Sample Request:**
-  ```bash
-  curl -X POST http://localhost:3000/api/auth/login \
-    -H "Content-Type: application/json" \
-    -d '{
-      "username": "Stanford.Goyette",
-      "password": "password123"
-    }'
-  ```
+**Endpoint**: `GET /api/admin/payslips/summary/{payroll_period_id}`
+**Authorization**: Bearer Token (Admin)
 
-  **Sample Response:**
-  ```json
-  {
-    "token": "XXX.YYY.ZZZ"
-  }
-  ```
+**Example**: `GET /api/admin/payslips/summary/1`
 
-### 3. Employee - Submit Attendance
+**Response**:
+```json
+{
+  "period": "2025-06-01 to 2025-06-30",
+  "summary": [
+    {
+      "employee_id": 1,
+      "total_pay": 8750.54
+    },
+    {
+      "employee_id": 2,
+      "total_pay": 6318.94
+    }
+  ],
+  "total_take_home": "695589.42"
+}
+```
 
-  **Sample Request:**
-  ```bash
-  curl -X POST http://localhost:3000/api/employees/attendance \
-    -H "Authorization: Bearer <EMPLOYEE_TOKEN>" \
-    -H "Content-Type: application/json" \
-    -d '{}'
-  ```
+## Authentication
 
-  **Sample Response:**
-  ```json
-  {
-    "message":"Attendance submitted successfully."
-  }
-  ```
+### JWT Token Usage
 
-### 4. Employee - Submit Overtime
+All protected endpoints require a valid JWT token in the Authorization header:
 
-  **Sample Request:**
-  ```bash
-  curl -X POST http://localhost:3000/api/employees/overtime \
-    -H "Content-Type: application/json" \
-    -H "Authorization: Bearer <EMPLOYEE_TOKEN>" \
-    -d '{
-      "date": "2025-06-07",
-      "hours": 2.5
-    }'
-  ```
+```bash
+curl -H "Authorization: Bearer <YOUR_JWT_TOKEN>" \
+     -X GET http://localhost:3000/api/protected-endpoint
+```
 
-  **Sample Response:**
-  ```json
-  {"message":"Overtime submitted successfully."}
-  ```
+### Token Expiration
 
-### 5. Employee - Submit Reimbursement
+- **Default Expiration**: 24 hours
+- **Renewal**: Tokens must be refreshed by re-authenticating
+- **Security**: Tokens are signed with a secure secret key
 
-  **Sample Request:**
-  ```bash
-  curl -X POST http://localhost:3000/api/employees/reimbursement \
-    -H "Content-Type: application/json" \
-    -H "Authorization: Bearer <EMPLOYEE_TOKEN>" \
-    -d '{
-      "amount": 150.75,
-      "description": "Taxi fare for client meeting",
-      "date": "2025-06-07"
-    }'
-  ```
+## User Roles
 
-  **Sample Response:**
-  ```json
-  {"message":"Reimbursement submitted successfully."}
-  ```
+### Employee Role
+**Capabilities**:
+- Submit daily attendance
+- Log overtime hours
+- Submit reimbursement claims
+- Generate personal payslips
+- View personal payroll data
 
-### 6. ADMIN - Login
+**Restrictions**:
+- Cannot access administrative functions
+- Cannot view other employees' data
+- Cannot process payroll
 
-  **Sample Request:**
-  ```bash
-  curl -X POST http://localhost:3000/api/auth/admin/login \
-    -H "Content-Type: application/json" \
-    -d '{
-      "username": "admin",
-      "password": "admin123"
-    }'
-  ```
+### Administrator Role
+**Capabilities**:
+- All employee capabilities
+- Create and manage payroll periods
+- Process payroll for all employees
+- Generate company-wide payroll summaries
+- Access administrative dashboards
 
-  **Sample Response:**
-  ```json
-  {
-    "token": "XXX.YYY.ZZZ"
-  }
-  ```
+**Responsibilities**:
+- Payroll period management
+- Payroll processing oversight
+- System administration
 
-### 7. ADMIN - Run Payroll
+## Testing
 
-  **Sample Request:**
-  ```bash
-    curl -X POST http://localhost:3000/api/admin/run-payroll/1 \
-      -H "Authorization: Bearer <EMPLOYEE_TOKEN>"
-  ```
+### Run All Tests
 
-  **Sample Response:**
-  ```json
-    {"message":"✅ Payroll processed successfully.","summary":{"processed_employees":100,"period":{"id":1,"start":"2025-06-01","end":"2025-06-30"}}}
-  ```
+Execute the complete test suite:
 
-### 8. EMPLOYEE - Generate Payslip
+```bash
+npm test
+```
 
-  **Sample Request:**
-  ```bash
-    curl -X POST http://localhost:3000/api/employees/generate-payslip \
-    -H "Content-Type: application/json" \
-    -H "Authorization: Bearer <EMPLOYEE_TOKEN>" \
-    -d '{"payroll_period_id": 1}'
-  ```
+### Run Individual Test Files
 
-  **Sample Response:**
-  ```json
-    {"message":"✅ Payslip generated successfully.","payslip":{"employee_id":6,"payroll_period_id":1,"base_salary":"7637.14","attendance_days":22,"overtime_hours":"14.68","overtime_pay":"1216.10","reimbursements":"150.75","total_pay":"9004.00","created_by":"Stanford.Goyette","updated_by":"Stanford.Goyette","ip_address":"::1"},"pdf":"/pdf/payslip_6_1.pdf"}
-  ```
+Execute specific test modules:
 
-### 9. ADMIN - Generate Summary Payslips
+```bash
+npm test -- tests/employeeController.test.js
+npm test -- tests/adminController.test.js
+npm test -- tests/authController.test.js
+```
 
-  **Sample Request:**
-  ```bash
-    curl -X GET http://localhost:3000/api/admin/payslips/summary/1 \
-    -H "Authorization: Bearer <ADMIN_TOKEN>" \
-    -H "Content-Type: application/json"
-  ```
+### Test Categories
 
-  **Sample Response:**
-  ```json
-    {"period":"2025-06-01 to 2025-06-30","summary":[{"employee_id":1,"total_pay":8750.54},{"employee_id":2,"total_pay":6318.94},{"employee_id":3,"total_pay":6014.84},{"employee_id":4,"total_pay":4304.05},{"employee_id":5,"total_pay":6968.01},{"employee_id":6,"total_pay":8444.04},{"employee_id":7,"total_pay":9406.76},{"employee_id":8,"total_pay":10922.89},{"employee_id":9,"total_pay":6941.71},{"employee_id":10,"total_pay":3745.66},{"employee_id":11,"total_pay":7021.34},{"employee_id":12,"total_pay":6132.94},{"employee_id":13,"total_pay":5482.89},{"employee_id":14,"total_pay":4695.28},{"employee_id":15,"total_pay":10725.31},{"employee_id":16,"total_pay":8141.71},{"employee_id":17,"total_pay":9162.2},{"employee_id":18,"total_pay":4224.62},{"employee_id":19,"total_pay":5340.23},{"employee_id":20,"total_pay":8040.16},{"employee_id":21,"total_pay":8650.72},{"employee_id":22,"total_pay":6980.06},{"employee_id":23,"total_pay":8436.64},{"employee_id":24,"total_pay":3809.59},{"employee_id":25,"total_pay":7641.32},{"employee_id":26,"total_pay":4000.84},{"employee_id":27,"total_pay":3763.09},{"employee_id":28,"total_pay":8272.29},{"employee_id":29,"total_pay":8311.52},{"employee_id":30,"total_pay":10150.19},{"employee_id":31,"total_pay":9395.15},{"employee_id":32,"total_pay":3212.73},{"employee_id":33,"total_pay":9775.59},{"employee_id":34,"total_pay":7728.14},{"employee_id":35,"total_pay":8178.85},{"employee_id":36,"total_pay":3723.58},{"employee_id":37,"total_pay":6471.66},{"employee_id":38,"total_pay":6872.45},{"employee_id":39,"total_pay":3915.66},{"employee_id":40,"total_pay":7902.52},{"employee_id":41,"total_pay":5235.86},{"employee_id":42,"total_pay":4521.75},{"employee_id":43,"total_pay":4012.26},{"employee_id":44,"total_pay":6661.42},{"employee_id":45,"total_pay":9982.3},{"employee_id":46,"total_pay":5813.93},{"employee_id":47,"total_pay":7029.29},{"employee_id":48,"total_pay":8123.16},{"employee_id":49,"total_pay":6619.89},{"employee_id":50,"total_pay":5728.51},{"employee_id":51,"total_pay":8896.15},{"employee_id":52,"total_pay":9124.63},{"employee_id":53,"total_pay":11102.43},{"employee_id":54,"total_pay":4085.99},{"employee_id":55,"total_pay":8813.85},{"employee_id":56,"total_pay":7899.74},{"employee_id":57,"total_pay":4690.04},{"employee_id":58,"total_pay":9688.88},{"employee_id":59,"total_pay":8165.61},{"employee_id":60,"total_pay":9871.9},{"employee_id":61,"total_pay":5005.78},{"employee_id":62,"total_pay":7923.1},{"employee_id":63,"total_pay":3489.74},{"employee_id":64,"total_pay":6730.09},{"employee_id":65,"total_pay":8588.05},{"employee_id":66,"total_pay":7134.66},{"employee_id":67,"total_pay":8686.69},{"employee_id":68,"total_pay":7730.07},{"employee_id":69,"total_pay":9284.92},{"employee_id":70,"total_pay":3924.47},{"employee_id":71,"total_pay":8948.97},{"employee_id":72,"total_pay":8520.73},{"employee_id":73,"total_pay":6383.08},{"employee_id":74,"total_pay":8734.34},{"employee_id":75,"total_pay":8225.68},{"employee_id":76,"total_pay":10974.62},{"employee_id":77,"total_pay":6184.78},{"employee_id":78,"total_pay":4396.7},{"employee_id":79,"total_pay":3561.17},{"employee_id":80,"total_pay":5677.86},{"employee_id":81,"total_pay":10378.95},{"employee_id":82,"total_pay":9761.69},{"employee_id":83,"total_pay":5586.45},{"employee_id":84,"total_pay":6483.75},{"employee_id":85,"total_pay":4622.8},{"employee_id":86,"total_pay":5845.6},{"employee_id":87,"total_pay":3523.69},{"employee_id":88,"total_pay":6702.86},{"employee_id":89,"total_pay":4302.2},{"employee_id":90,"total_pay":5541.02},{"employee_id":91,"total_pay":8000.49},{"employee_id":92,"total_pay":4913.6},{"employee_id":93,"total_pay":8456.46},{"employee_id":94,"total_pay":6145.96},{"employee_id":95,"total_pay":4232.19},{"employee_id":96,"total_pay":7244.16},{"employee_id":97,"total_pay":5725.43},{"employee_id":98,"total_pay":3612.68},{"employee_id":99,"total_pay":9620.94},{"employee_id":100,"total_pay":10738.7}],"total_take_home":"695589.42"}
+- **Unit Tests**: Individual function and method testing
+- **Integration Tests**: API endpoint testing
+- **Authentication Tests**: JWT and authorization testing
+- **Database Tests**: Data persistence and retrieval testing
 
-  ```
+## Architecture Overview
 
-## RUN Tests
+### System Architecture
 
-    all:
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Client Apps   │    │   API Gateway   │    │   Database      │
+│                 │    │                 │    │                 │
+│ • Web Frontend  │◄──►│ • Express.js    │◄──►│ • PostgreSQL    │
+│ • Mobile Apps   │    │ • JWT Auth      │    │ • Sequelize ORM │
+│ • API Clients   │    │ • Rate Limiting │    │ • Migrations    │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+                                │
+                                ▼
+                       ┌─────────────────┐
+                       │  Business Logic │
+                       │                 │
+                       │ • Controllers   │
+                       │ • Services      │
+                       │ • Validation    │
+                       │ • PDF Generation│
+                       └─────────────────┘
+```
 
-        npm test
+### Database Schema
 
-    individual file:
+#### Core Tables
 
-        npm test -- tests/employeeController.test.js
+**employees**
+- Employee personal and professional information
+- Authentication credentials
+- Role-based permissions
+
+**payroll_periods**
+- Payroll period definitions
+- Processing status tracking
+- Audit information
+
+**attendances**
+- Daily attendance records
+- Employee-period relationships
+- Timestamp tracking
+
+**overtimes**
+- Overtime hour submissions
+- Date and duration tracking
+- Employee associations
+
+**reimbursements**
+- Expense claim records
+- Amount and description details
+- Approval workflow support
+
+**payslips**
+- Generated payslip records
+- Calculated pay components
+- PDF file references
+
+### Security Architecture
+
+#### Authentication Flow
+1. **User Login**: Credentials validation against database
+2. **Token Generation**: JWT token creation with user claims
+3. **Token Validation**: Middleware verification on protected routes
+4. **Authorization**: Role-based access control enforcement
+
+#### Security Measures
+- **Password Security**: Hashed password storage
+- **JWT Security**: Signed tokens with expiration
+- **Input Validation**: Request payload sanitization
+- **SQL Injection Prevention**: Parameterized queries via ORM
+- **Audit Logging**: User action tracking with IP addresses
+
+### API Design Principles
+
+#### RESTful Architecture
+- **Resource-based URLs**: Clear endpoint naming conventions
+- **HTTP Methods**: Appropriate verb usage (GET, POST, PUT, DELETE)
+- **Status Codes**: Consistent HTTP response codes
+- **JSON Communication**: Standardized request/response format
+
+#### Error Handling
+- **Consistent Format**: Standardized error response structure
+- **Meaningful Messages**: Clear, actionable error descriptions
+- **Status Codes**: Appropriate HTTP status code usage
+- **Logging**: Comprehensive error logging for debugging
+
+## Troubleshooting
+
+### Common Issues
+
+#### Database Connection Errors
+**Problem**: Cannot connect to PostgreSQL database
+**Solutions**:
+1. Verify PostgreSQL service is running
+2. Check database credentials in `.env` file
+3. Confirm database exists and user has proper permissions
+4. Test connection using `psql` command line tool
+
+#### JWT Token Issues
+**Problem**: Authentication failures or token errors
+**Solutions**:
+1. Verify JWT secret is properly configured
+2. Check token expiration settings
+3. Ensure proper Authorization header format
+4. Validate token generation and signing process
+
+#### PDF Generation Failures
+**Problem**: Payslip PDF generation errors
+**Solutions**:
+1. Check file system permissions for PDF directory
+2. Verify PDF generation library installation
+3. Ensure adequate disk space for file creation
+4. Review PDF template configuration
+
+#### Seeding Failures
+**Problem**: Database seeding process fails
+**Solutions**:
+1. Verify database connection and permissions
+2. Check for existing data conflicts
+3. Ensure proper Sequelize configuration
+4. Review seeder file syntax and logic
+
+### Performance Optimization
+
+#### Database Optimization
+- **Indexing**: Proper database indexing for frequently queried fields
+- **Query Optimization**: Efficient query patterns using Sequelize
+- **Connection Pooling**: Database connection pool configuration
+- **Data Archiving**: Historical data management strategies
+
+#### API Performance
+- **Caching**: Response caching for frequently accessed data
+- **Rate Limiting**: API request throttling implementation
+- **Pagination**: Large dataset pagination support
+- **Compression**: Response compression for reduced bandwidth
+
+### Monitoring and Logging
+
+#### Application Monitoring
+- **Health Checks**: System health monitoring endpoints
+- **Performance Metrics**: Response time and throughput tracking
+- **Error Tracking**: Comprehensive error logging and alerting
+- **Resource Usage**: Memory and CPU utilization monitoring
+
+#### Security Monitoring
+- **Authentication Logs**: Login attempt tracking
+- **Authorization Failures**: Access denial logging
+- **Suspicious Activity**: Anomaly detection and reporting
+- **Audit Trails**: Comprehensive user action logging
+
+## Contributing
+
+### Development Guidelines
+- Follow established coding standards and conventions
+- Write comprehensive tests for new features
+- Update documentation for API changes
+- Use meaningful commit messages and pull request descriptions
+
+### Code Quality
+- **Linting**: ESLint configuration for code consistency
+- **Testing**: Minimum test coverage requirements
+- **Security**: Security vulnerability scanning
+- **Performance**: Performance impact assessment
+
+This documentation provides a comprehensive guide for understanding, implementing, and maintaining the Payroll Management System. For additional support or questions, please refer to the project's issue tracker or contact the development team.
