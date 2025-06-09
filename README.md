@@ -50,7 +50,7 @@ A comprehensive Node.js-based payroll management system with PostgreSQL database
 
 ```bash
 git clone git@github.com:kangmasjuqi/marjuqi-payslip-api.git
-cd payroll-management-system
+cd marjuqi-payslip-api
 ```
 
 ### Step 2: Install Dependencies
